@@ -1,0 +1,70 @@
+x-spark-common: &spark-common
+  image: bitnami/spark:3.5.1
+  volumes:
+    - ./jobs:/opt/bitnami/spark/jobs
+  networks:
+    - spark-airflow-net
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - airflow.env
+  volumes:
+    - ./jobs:/opt/airflow/jobs
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    - postgres
+  networks:
+    - spark-airflow-net
+
+services:
+  spark-master:
+    <<: *spark-common
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "9090:8080"
+      - "7077:7077"
+    environment:
+      PYSPARK_PYTHON: python3.9
+      PYSPARK_DRIVER_PYTHON: python3.9
+      SPARK_MODE: master
+
+  spark-worker:
+    <<: *spark-common
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 1g
+      SPARK_MASTER_URL: spark://spark-master:7077
+      PYSPARK_PYTHON: python3.9
+      PYSPARK_DRIVER_PYTHON: python3.9
+
+  postgres:
+    image: postgres:18
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - spark-airflow-net
+
+  webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - scheduler
+
+  scheduler:
+    <<: *airflow-common
+    command: bash -c "airflow db init && airflow users create --username admin --firstname Tathagata --lastname Das --role Admin --email tathagatadas003@gmail.com --password admin && airflow scheduler"
+
+networks:
+  spark-airflow-net:
