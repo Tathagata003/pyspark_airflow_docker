@@ -12,7 +12,7 @@ x-airflow-common: &airflow-common
   env_file:
     - airflow.env
   volumes:
-    - ./jobs:/opt/airflow/jobs
+    - ./jobs:/opt/spark/jobs
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
   depends_on:
@@ -28,8 +28,8 @@ services:
       - "9090:8080"
       - "7077:7077"
     environment:
-      PYSPARK_PYTHON: python3.9
-      PYSPARK_DRIVER_PYTHON: python3.9
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.11
+      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.11
       SPARK_MODE: master
 
   spark-worker:
@@ -42,11 +42,11 @@ services:
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1g
       SPARK_MASTER_URL: spark://spark-master:7077
-      PYSPARK_PYTHON: python3.9
-      PYSPARK_DRIVER_PYTHON: python3.9
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.11
+      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.11
 
   postgres:
-    image: postgres:18
+    image: postgres:14
     environment:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
@@ -56,7 +56,7 @@ services:
 
   webserver:
     <<: *airflow-common
-    command: webserver
+    command: api-server
     ports:
       - "8080:8080"
     depends_on:
@@ -64,7 +64,7 @@ services:
 
   scheduler:
     <<: *airflow-common
-    command: bash -c "airflow db init && airflow users create --username admin --firstname Tathagata --lastname Das --role Admin --email tathagatadas003@gmail.com --password admin && airflow scheduler"
+    command: bash -c "airflow db migrate && airflow scheduler"
 
 networks:
   spark-airflow-net:
